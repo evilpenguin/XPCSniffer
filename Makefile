@@ -9,7 +9,7 @@ ARCHS := arm64 arm64e
 TWEAK_NAME = XPCSniffer
 $(TWEAK_NAME)_FILES = Tweak.xm
 $(TWEAK_NAME)_CFLAGS += -DTHEOS_LEAN_AND_MEAN
-$(TWEAK_NAME)_FRAMEWORKS = UIKit
+$(TWEAK_NAME)_FRAMEWORKS = CoreFoundation Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

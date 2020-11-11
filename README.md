@@ -6,12 +6,12 @@ Usage
 - Open up the Console.app on macOS
 - Search for `XPCSniffer` on your device
 - Output will be `+[XPCSniffer] Writing to /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSNiffer.log`
-- SSH into your device and `tail -f /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSNiffer.log`
+- SSH into your device and `tail -f /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSniffer.log`
 
 Notes
 ----------
 - Update the filter plist with the `Bundles` or `Executables` you want to dump.
-- Setup `DEBUG` to 1 or 0 inside the Makefile for logging
+- Set `DEBUG` to `1` or `0` inside the Makefile for logging.
 
 Screenshot
 ----------

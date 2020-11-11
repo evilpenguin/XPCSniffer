@@ -14,6 +14,11 @@
 #include "xpc/xpc.h"
 #include "substrate.h"
 
+#pragma mark - variables
+
+static dispatch_queue_t _xpcsniffer_queue = dispatch_queue_create("XPCSniffer",  DISPATCH_QUEUE_SERIAL);
+static CFPropertyListRef (*__CFBinaryPlistCreate15)(const uint8_t *, uint64_t) = nil;
+
 #pragma mark - functions
 
 static NSString *_xpcsniffer_get_timestring();
@@ -22,6 +27,8 @@ static NSString *_xpcsniffer_connection_name(xpc_connection_t connection);
 static NSString *_xpcsniffer_proc_name(int pid);
 static bool _xpcsniffer_message_dump(const char *key, xpc_object_t value, NSMutableDictionary *logDictionary) ;
 static bool _xpcsniffer_dumper(xpc_object_t obj, NSMutableDictionary *logDictionary);
+static int _xpcsniffer_bplist_type(const char *bytes, size_t length);
+static NSString *_xpcsniffer_parse_bplist(const char *bytes, size_t length, int type);
 
 #pragma mark - private
 
@@ -97,9 +104,15 @@ static bool _xpcsniffer_message_dump(const char *key, xpc_object_t value, NSMuta
         const char *bytes = (const char *)xpc_data_get_bytes_ptr(value);
 
         if (bytes) {
-            NSMutableString *hexString = [NSMutableString string];
-            for (int i = 0; i < length; i++) [hexString appendFormat:@"%02x ", (unsigned char)bytes[i]];
-            logDictionary[logKey] = hexString;
+            int plistType = _xpcsniffer_bplist_type(bytes, length);
+            if (plistType >= 0) {
+                logDictionary[logKey] = _xpcsniffer_parse_bplist(bytes, length, plistType);
+            }
+            else {
+                NSMutableString *hexString = [NSMutableString string];
+                for (int i = 0; i < length; i++) [hexString appendFormat:@"%02x ", (unsigned char)bytes[i]];
+                logDictionary[logKey] = hexString;
+            }
         }
     }
     else if (type == XPC_TYPE_ARRAY) {
@@ -113,6 +126,60 @@ static bool _xpcsniffer_message_dump(const char *key, xpc_object_t value, NSMuta
     }
 
     return true;
+}
+
+static int _xpcsniffer_bplist_type(const char *bytes, size_t length) {
+    int type = -1;
+
+    if (bytes && length >= 8) {
+        char plistType[9] = {};
+        memcpy(plistType, bytes, 8);
+
+        if (strcmp(plistType, "bplist16") == 0)         type = 16;
+        else if (strcmp(plistType, "bplist15") == 0)    type = 15;
+        else if (strcmp(plistType, "bplist00") == 0)    type = 0;
+    }
+
+    return type;
+}
+
+static NSString *_xpcsniffer_parse_bplist(const char *bytes, size_t length, int type) {
+    NSString *returnValue = nil;
+
+    switch (type) {
+        // bplist00
+        case 0: {
+            NSError *error = nil;    
+            NSData *data = [NSData dataWithBytes:bytes length:length];
+            id plist = [NSPropertyListSerialization propertyListWithData:data options:0 format:nil error:&error];
+            if (!error && plist) returnValue = [plist description];
+
+            break;
+        }   
+        // bplist15
+        case 15: {
+            if (__CFBinaryPlistCreate15) {
+                CFPropertyListRef plist = __CFBinaryPlistCreate15((const uint8_t *)bytes, length);
+                if (plist) { 
+                    CFErrorRef dataError = nil;
+                    CFDataRef xmlData = CFPropertyListCreateData(kCFAllocatorDefault, plist, kCFPropertyListXMLFormat_v1_0, 0, &dataError);
+                    if (!dataError && xmlData) {
+                        NSData *data = (__bridge NSData *)xmlData;
+                        returnValue = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                        
+                        CFRelease(xmlData);
+                    }
+                }
+            }
+
+            break;
+        }
+        // bplist16
+        case 16:
+            break;
+    }
+
+    return returnValue;
 }
 
 static bool _xpcsniffer_dumper(xpc_object_t obj, NSMutableDictionary *logDictionary) {
@@ -148,25 +215,29 @@ static bool _xpcsniffer_dumper(xpc_object_t obj, NSMutableDictionary *logDiction
 }
 
 static void _xpcsniffer_log_to_file(NSDictionary *dictionary) {
-    NSString *cachesDirectory = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *logPath = [cachesDirectory stringByAppendingPathComponent:@"XPCSniffer.log"];
-    NSLog(@"+[XPCSniffer] Writing to %@", logPath);
+    dispatch_async(_xpcsniffer_queue, ^{
+        NSString *cachesDirectory = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+        NSString *logPath = [cachesDirectory stringByAppendingPathComponent:@"XPCSniffer.log"];
+        NSLog(@"+[XPCSniffer] Writing to %@", logPath);
 
-    if (![NSFileManager.defaultManager fileExistsAtPath:logPath]) {
-        [NSData.data writeToFile:logPath atomically:YES];
-    } 
+        if (![NSFileManager.defaultManager fileExistsAtPath:logPath]) {
+            [NSData.data writeToFile:logPath atomically:YES];
+        } 
 
-    // Make message
-    NSError *err = nil;
-    NSData *jsonData = [NSJSONSerialization  dataWithJSONObject:dictionary options:0 error:&err];
-    NSString *message = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-    message = [message stringByAppendingString:@"\n"];
-
-    // append
-    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:logPath];
-    [handle truncateFileAtOffset:handle.seekToEndOfFile];
-    [handle writeData:[message dataUsingEncoding:NSUTF8StringEncoding]];
-    [handle closeFile];
+        // Make message
+        NSError *error = nil;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dictionary options:0 error:&error];
+        if (!error && jsonData) {
+            NSString *message = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+            message = [message stringByAppendingString:@"\n"];
+            
+            // Append message
+            NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:logPath];
+            [handle truncateFileAtOffset:handle.seekToEndOfFile];
+            [handle writeData:[message dataUsingEncoding:NSUTF8StringEncoding]];
+            [handle closeFile];
+        }
+    });
 }
 
 #pragma mark - xpc_connection_create
@@ -251,6 +322,12 @@ __unused static xpc_object_t new_xpc_connection_send_message_with_reply_sync(xpc
 %ctor {
     @autoreleasepool {     
         DLog(@"~~ Hooking ~~");
+
+        void *cf_handle = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW);
+        DLog(@"cf_handle: %p", cf_handle);
+        __CFBinaryPlistCreate15 = (CFPropertyListRef(*)(const uint8_t *, uint64_t))dlsym(cf_handle, "__CFBinaryPlistCreate15");
+         DLog(@"__CFBinaryPlistCreate15 %p", __CFBinaryPlistCreate15);
+
         void *libxpc_handle = dlopen("/usr/lib/system/libxpc.dylib", RTLD_NOW);
         DLog(@"libxpc: %p", libxpc_handle);
 
@@ -288,6 +365,7 @@ __unused static xpc_object_t new_xpc_connection_send_message_with_reply_sync(xpc
             DLog(@"xpc_connection_send_message_with_reply_sync %p", xpc_connection_send_message_with_reply_sync);
             MSHookFunction((void *)xpc_connection_send_message_with_reply_sync, (void *)new_xpc_connection_send_message_with_reply_sync, (void **)&orig_xpc_connection_send_message_with_reply_sync);
         }
+
         DLog(@"~~ End Hooking ~~");
     }
 }
