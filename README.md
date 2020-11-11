@@ -5,7 +5,7 @@ Usage
 ----------
 - Open up the Console.app on macOS
 - Search for `XPCSniffer` on your device
-- Output will be `[NetworkLogger] Writing to /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSNiffer.log`
+- Output will be `+[XPCSniffer] Writing to /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSNiffer.log`
 - SSH into your device and `tail -f /var/mobile/Containers/Data/Application/APP_UUID/Library/Caches/XPCSNiffer.log`
 
 Notes
