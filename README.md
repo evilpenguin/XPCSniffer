@@ -12,7 +12,7 @@ Notes
 ----------
 - Update the filter plist with the `Bundles` or `Executables` you want to dump.
 - Set `DEBUG` to `1` or `0` inside the Makefile for logging.
-- Use [`jlutil`](http://newosxbook.com/tools/jlutil.html) to parse the `bplist16` and `bplist15` data (until I write in support).
+- Use [`jlutil`](http://newosxbook.com/tools/jlutil.html) to parse the `bplist16` data.
 
 Screenshot
 ----------
