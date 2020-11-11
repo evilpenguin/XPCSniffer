@@ -1,0 +1,9 @@
+Package: com.evilpenguin.xpcsniffer
+Name: XPCSniffer
+Depends: mobilesubstrate
+Version: 0.1
+Architecture: iphoneos-arm
+Description: XPCSniffer
+Maintainer: EvilPenguin
+Author: EvilPenguin
+Section: Tweaks
