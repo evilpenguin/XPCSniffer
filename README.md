@@ -13,6 +13,10 @@ Notes
 - Update the filter plist with the `Bundles` or `Executables` you want to dump.
 - Setup `DEBUG` to 1 or 0 inside the Makefile for logging
 
+Screenshot
+----------
+![All](all.png)
+
 Example Output
 ----------
 ```
