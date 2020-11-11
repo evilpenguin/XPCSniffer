@@ -73,6 +73,13 @@ static NSString *_xpcsniffer_proc_name(int pid) {
     return @(buffer);
 }
 
+static NSString *_xpcsniffer_hex_string(const char *bytes, size_t length) {
+    NSMutableString *hexString = [NSMutableString string];
+    for (int i = 0; i < length; i++) [hexString appendFormat:@"%02x ", (unsigned char)bytes[i]];
+
+    return hexString;
+}
+
 static bool _xpcsniffer_message_dump(const char *key, xpc_object_t value, NSMutableDictionary *logDictionary) {
     NSString *logKey = [NSString stringWithUTF8String:key];
     xpc_type_t type = xpc_get_type(value);
@@ -109,9 +116,7 @@ static bool _xpcsniffer_message_dump(const char *key, xpc_object_t value, NSMuta
                 logDictionary[logKey] = _xpcsniffer_parse_bplist(bytes, length, plistType);
             }
             else {
-                NSMutableString *hexString = [NSMutableString string];
-                for (int i = 0; i < length; i++) [hexString appendFormat:@"%02x ", (unsigned char)bytes[i]];
-                logDictionary[logKey] = hexString;
+                logDictionary[logKey] = _xpcsniffer_hex_string(bytes, length);
             }
         }
     }
@@ -171,11 +176,15 @@ static NSString *_xpcsniffer_parse_bplist(const char *bytes, size_t length, int 
                     }
                 }
             }
+            else {
+                returnValue = _xpcsniffer_hex_string(bytes, length);
+            }
 
             break;
         }
         // bplist16
         case 16:
+            returnValue = _xpcsniffer_hex_string(bytes, length);
             break;
     }
 
