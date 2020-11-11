@@ -24,7 +24,7 @@ static CFPropertyListRef (*__CFBinaryPlistCreate15)(const uint8_t *, uint64_t) =
 #pragma mark - functions
 
 static uint64_t _xpcsniffer_real_signextend_64(uint64_t imm, uint8_t bit);
-static uintptr_t *_xpcsniffer_step64(uint32_t *base, size_t length, uint8_t bl_count, uint32_t what, uint32_t mask);
+static uintptr_t *_xpcsniffer_step64(uint32_t *base, size_t length, uint8_t step_count, uint32_t what, uint32_t mask);
 static NSString *_xpcsniffer_get_timestring();
 static NSMutableDictionary *_xpcsniffer_dictionary(xpc_connection_t connection);
 static NSString *_xpcsniffer_connection_name(xpc_connection_t connection);
@@ -49,15 +49,15 @@ static uint64_t _xpcsniffer_real_signextend_64(uint64_t imm, uint8_t bit) {
     return imm;
 }
 
-static uintptr_t *_xpcsniffer_step64(uint32_t *base, size_t length, uint8_t bl_count, uint32_t what, uint32_t mask) {
+static uintptr_t *_xpcsniffer_step64(uint32_t *base, size_t length, uint8_t step_count, uint32_t what, uint32_t mask) {
     uint32_t *start = (uint32_t *)base;
     uint32_t *end = start + length;
-    uint8_t current_bl_count = 0;
+    uint8_t current_step_count = 0;
 
     while (start < end) {
         uint32_t operation = *start;
         if ((operation & mask) == what) {
-            if (++current_bl_count == bl_count) {
+            if (++current_step_count == step_count) {
                 signed imm = (operation & 0x3ffffff) << 2;
                 imm = _xpcsniffer_real_signextend_64(imm, 27);
                 uintptr_t addr = reinterpret_cast<uintptr_t>(start) + imm;
