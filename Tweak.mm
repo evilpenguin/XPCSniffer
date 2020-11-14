@@ -170,12 +170,9 @@ static int _xpcsniffer_bplist_type(const char *bytes, size_t length) {
     int type = -1;
 
     if (bytes && length >= 8) {
-        char plistType[9] = {};
-        memcpy(plistType, bytes, 8);
-
-        if (strcmp(plistType, "bplist16") == 0)         type = 16;
-        else if (strcmp(plistType, "bplist15") == 0)    type = 15;
-        else if (strcmp(plistType, "bplist00") == 0)    type = 0;
+        if (memcmp(bytes, "bplist16", 8) == 0)      type = 16;
+        else if (memcmp(bytes, "bplist15", 8) == 0) type = 15;
+        else if (memcmp(bytes, "bplist00", 8) == 0) type = 0;
     }
 
     return type;
